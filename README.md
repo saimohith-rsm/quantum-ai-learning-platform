@@ -171,3 +171,5 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step instructions.
 - **Problem Statement**: #26140 - AI-Based Interactive Quantum Algorithm Learning Platform
 - **Theme**: Smart Education
 - **Category**: Software
+#   q u a n t u m - a i - l e a r n i n g - p l a t f o r m  
+ 
