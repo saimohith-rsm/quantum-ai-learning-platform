@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+dist-ssr/
+*.local
+.npm
+
+# Python artifacts
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.pytest_cache/
+*.log
+
+# SQLite runtime locks
+*.db-shm
+*.db-wal
+
+# Environment files (exclude templates)
+.env
+.env.*
+!.env.example
+
+# OS & Temp archives
+.DS_Store
+Thumbs.db
+*.zip
