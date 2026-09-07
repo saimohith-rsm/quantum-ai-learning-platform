@@ -51,6 +51,19 @@ async def add_security_headers(request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
 
+# Route Compatibility Middleware: transparently support paths with or without /api prefix
+@app.middleware("http")
+async def rewrite_missing_api_prefix(request, call_next):
+    path = request.scope.get("path", "")
+    api_prefixes = (
+        "/auth", "/quantum", "/tutor", "/curriculum",
+        "/challenges", "/circuits", "/user"
+    )
+    if any(path == p or path.startswith(f"{p}/") for p in api_prefixes):
+        request.scope["path"] = f"/api{path}"
+    return await call_next(request)
+
+
 # Configure CORS for React frontend
 app.add_middleware(
     CORSMiddleware,

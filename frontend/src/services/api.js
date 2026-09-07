@@ -1,4 +1,16 @@
-const API_BASE = import.meta.env.VITE_API_BASE || '/api';
+function resolveApiBase() {
+  let raw = (import.meta.env.VITE_API_BASE || '/api').trim();
+  raw = raw.replace(/\/+$/, '');
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    if (!raw.endsWith('/api')) {
+      raw = `${raw}/api`;
+    }
+  }
+  return raw;
+}
+
+const API_BASE = resolveApiBase();
+
 
 export function getStoredToken() {
   return localStorage.getItem('quantum_token');
