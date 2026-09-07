@@ -21,43 +21,78 @@ function getAuthHeaders() {
   return headers;
 }
 
-export async function loginUser(credentials) {
-  const resp = await fetch(`${API_BASE}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(credentials)
-  });
-  if (!resp.ok) {
-    const err = await resp.json();
-    throw new Error(err.detail || 'Login failed');
+async function handleResponse(resp, actionName = 'Request') {
+  const contentType = resp.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    if (!resp.ok) {
+      if (resp.status === 404) {
+        throw new Error(
+          `Backend endpoint not found (404). If deployed on Vercel, ensure you added environment variable VITE_API_BASE pointing to your Render backend URL (e.g. https://<your-backend>.onrender.com/api).`
+        );
+      }
+      throw new Error(`Server returned HTTP ${resp.status} with unexpected non-JSON response.`);
+    }
+    // If status 200 but HTML (Vercel SPA fallback rewrite)
+    throw new Error(
+      `Received HTML instead of JSON. Your frontend cannot reach the backend API. Please set VITE_API_BASE in your Vercel project settings to your Render backend URL (e.g. https://<your-backend>.onrender.com/api).`
+    );
   }
-  return resp.json();
+
+  const data = await resp.json();
+  if (!resp.ok) {
+    const errorMsg = data.detail || `${actionName} failed (HTTP ${resp.status})`;
+    throw new Error(errorMsg);
+  }
+  return data;
+}
+
+function handleFetchError(err, actionName = 'Action') {
+  if (err.name === 'TypeError' && err.message.toLowerCase().includes('fetch')) {
+    throw new Error(
+      `Cannot connect to backend server. If using Render free tier, the server may take ~30-50 seconds to wake up from sleep. Please wait a moment and try again.`
+    );
+  }
+  throw err;
+}
+
+export async function loginUser(credentials) {
+  try {
+    const resp = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials)
+    });
+    return await handleResponse(resp, 'Login');
+  } catch (err) {
+    handleFetchError(err, 'Login');
+  }
 }
 
 export async function registerUser(userData) {
-  const resp = await fetch(`${API_BASE}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(userData)
-  });
-  if (!resp.ok) {
-    const err = await resp.json();
-    throw new Error(err.detail || 'Registration failed');
+  try {
+    const resp = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    });
+    return await handleResponse(resp, 'Registration');
+  } catch (err) {
+    handleFetchError(err, 'Registration');
   }
-  return resp.json();
 }
 
 export async function demoLogin() {
-  const resp = await fetch(`${API_BASE}/auth/demo-login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
-  });
-  if (!resp.ok) {
-    const err = await resp.json();
-    throw new Error(err.detail || 'Demo login failed');
+  try {
+    const resp = await fetch(`${API_BASE}/auth/demo-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return await handleResponse(resp, 'Demo login');
+  } catch (err) {
+    handleFetchError(err, 'Demo login');
   }
-  return resp.json();
 }
+
 
 export async function getMe(token) {
   const headers = token ? { 'Authorization': `Bearer ${token}` } : getAuthHeaders();

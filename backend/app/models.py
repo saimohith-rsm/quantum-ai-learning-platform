@@ -1,84 +1,79 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, Boolean, Float, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
-from app.database import Base
+from typing import Optional, Any, Dict
 
 def utc_now():
     return datetime.now(timezone.utc)
 
+class DocumentModel:
+    """Base document model with dual attribute and dict-like access for MongoDB documents."""
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
-class User(Base):
-    __tablename__ = "users"
+    def to_dict(self) -> Dict[str, Any]:
+        return {k: v for k, v in self.__dict__.items() if not k.startswith('_')}
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    username = Column(String(64), unique=True, index=True, nullable=False)
-    display_name = Column(String(128), default="Learner")
-    email = Column(String(128), unique=True, nullable=True)
-    password_hash = Column(String(256), nullable=True)
-    level = Column(String(32), default="Beginner")  # Beginner, Intermediate, Advanced, Master
-    xp = Column(Integer, default=0)
-    badges = Column(Text, default="")  # Comma-separated badges
-    created_at = Column(DateTime, default=utc_now)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    def __getitem__(self, item):
+        return getattr(self, item)
 
-    # Relationships
-    circuits = relationship("SavedCircuit", back_populates="user", cascade="all, delete-orphan")
-    progress = relationship("LearningProgress", back_populates="user", cascade="all, delete-orphan")
-    submissions = relationship("ChallengeSubmission", back_populates="user", cascade="all, delete-orphan")
-    tutor_logs = relationship("TutorInteraction", back_populates="user", cascade="all, delete-orphan")
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
 
-class SavedCircuit(Base):
-    __tablename__ = "saved_circuits"
+    def get(self, key, default=None):
+        return getattr(self, key, default)
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    name = Column(String(128), nullable=False)
-    description = Column(Text, default="")
-    num_qubits = Column(Integer, default=2)
-    circuit_json = Column(Text, nullable=False)  # Serialized JSON of qubits and gate timeline
-    is_public = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=utc_now)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.to_dict()})"
 
-    user = relationship("User", back_populates="circuits")
+class User(DocumentModel):
+    id: int
+    username: str
+    display_name: str = "Learner"
+    email: Optional[str] = None
+    password_hash: Optional[str] = None
+    level: str = "Beginner"
+    xp: int = 0
+    badges: str = ""
+    created_at: Any = None
+    updated_at: Any = None
 
-class LearningProgress(Base):
-    __tablename__ = "learning_progress"
+class SavedCircuit(DocumentModel):
+    id: int
+    user_id: int
+    name: str
+    description: str = ""
+    num_qubits: int = 2
+    circuit_json: str = "{}"
+    is_public: bool = False
+    created_at: Any = None
+    updated_at: Any = None
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    module_id = Column(String(64), nullable=False, index=True)
-    lesson_id = Column(String(64), nullable=False, index=True)
-    completed = Column(Boolean, default=False)
-    quiz_score = Column(Float, default=0.0)
-    completed_at = Column(DateTime, default=utc_now)
+class LearningProgress(DocumentModel):
+    id: Optional[int] = None
+    user_id: int
+    module_id: str
+    lesson_id: str
+    completed: bool = False
+    quiz_score: float = 0.0
+    completed_at: Any = None
 
-    user = relationship("User", back_populates="progress")
+class ChallengeSubmission(DocumentModel):
+    id: Optional[int] = None
+    user_id: int
+    challenge_id: str
+    circuit_json: str
+    passed: bool = False
+    fidelity: float = 0.0
+    score: int = 0
+    feedback: str = ""
+    submitted_at: Any = None
 
-class ChallengeSubmission(Base):
-    __tablename__ = "challenge_submissions"
+class TutorInteraction(DocumentModel):
+    id: Optional[int] = None
+    user_id: Optional[int] = 1
+    circuit_id: Optional[int] = None
+    query_type: str = "chat"
+    prompt: str = ""
+    response: str = ""
+    created_at: Any = None
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    challenge_id = Column(String(64), nullable=False, index=True)
-    circuit_json = Column(Text, nullable=False)
-    passed = Column(Boolean, default=False)
-    fidelity = Column(Float, default=0.0)
-    score = Column(Integer, default=0)
-    feedback = Column(Text, default="")
-    submitted_at = Column(DateTime, default=utc_now)
-
-    user = relationship("User", back_populates="submissions")
-
-class TutorInteraction(Base):
-    __tablename__ = "tutor_interactions"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    circuit_id = Column(Integer, nullable=True)
-    query_type = Column(String(32), default="chat")  # explain, debug, hint, chat
-    prompt = Column(Text, nullable=False)
-    response = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=utc_now)
-
-    user = relationship("User", back_populates="tutor_logs")

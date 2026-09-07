@@ -1,61 +1,70 @@
 """
-Quick Interactive & Terminal Viewer for quantum_learning.db
-Run: python view_db.py [table_name]
+Interactive Terminal Viewer for MongoDB database (quantum_learning)
+Run: python view_db.py [collection_name]
 """
 import sys
-import sqlite3
 import os
+from pymongo import MongoClient
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "quantum_learning.db")
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "quantum_learning")
 
-def show_tables():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;")
-    tables = [row[0] for row in cursor.fetchall()]
+def get_mongo_db():
+    client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=3000)
+    return client[MONGODB_DB_NAME]
+
+def show_collections():
+    db = get_mongo_db()
+    collections = sorted(db.list_collection_names())
     print("\n" + "=" * 60)
-    print("  📊 DATABASE: quantum_learning.db")
+    print(f"  🍃 MONGODB DATABASE: {MONGODB_DB_NAME}")
+    print(f"  🔗 URI: {MONGODB_URI}")
     print("=" * 60)
-    for table in tables:
-        count = cursor.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
-        print(f"  • {table:<25} ({count} rows)")
+    for col_name in collections:
+        count = db[col_name].count_documents({})
+        print(f"  • {col_name:<25} ({count} documents)")
     print("=" * 60 + "\n")
-    return tables
+    return collections
 
-def show_table_data(table_name):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute(f"PRAGMA table_info({table_name});")
-    columns = [col[1] for col in cursor.fetchall()]
-    cursor.execute(f"SELECT * FROM {table_name} LIMIT 20;")
-    rows = cursor.fetchall()
+def show_collection_data(col_name):
+    db = get_mongo_db()
+    docs = list(db[col_name].find({}, {"_id": 0}).limit(10))
     
-    print(f"\n--- Table: {table_name} (Showing up to 20 rows) ---")
-    if not rows:
-        print("  (Empty table)")
+    print(f"\n--- Collection: {col_name} (Showing up to 10 documents) ---")
+    if not docs:
+        print("  (Empty collection)")
         return
-    
-    # Print headers
-    header = " | ".join(f"{col:<15}" for col in columns[:8])
+
+    # Extract all keys present in sample documents
+    all_keys = []
+    for d in docs:
+        for k in d.keys():
+            if k not in all_keys:
+                all_keys.append(k)
+
+    header = " | ".join(f"{k:<15}" for k in all_keys[:6])
     print(header)
     print("-" * len(header))
-    for row in rows:
-        row_str = " | ".join(f"{str(row[col])[:15]:<15}" for col in columns[:8])
+    for d in docs:
+        row_str = " | ".join(f"{str(d.get(k, ''))[:15]:<15}" for k in all_keys[:6])
         print(row_str)
     print()
 
 if __name__ == "__main__":
     if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        
-    tables = show_tables()
-    target = sys.argv[1] if len(sys.argv) > 1 else None
-    if target:
-        if target in tables:
-            show_table_data(target)
+
+    try:
+        collections = show_collections()
+        target = sys.argv[1] if len(sys.argv) > 1 else None
+        if target:
+            if target in collections:
+                show_collection_data(target)
+            else:
+                print(f"Collection '{target}' not found.")
         else:
-            print(f"Table '{target}' not found.")
-    else:
-        for t in tables:
-            show_table_data(t)
+            for c in collections:
+                show_collection_data(c)
+    except Exception as e:
+        print(f"❌ MongoDB connection error: {e}")
+

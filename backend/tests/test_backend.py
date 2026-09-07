@@ -21,17 +21,15 @@ class TestQuantumBackend(unittest.TestCase):
         init_db()
 
     def test_database_initialization(self):
-        """Verify database tables and seed data."""
+        """Verify MongoDB database collections and seed data."""
         db = SessionLocal()
-        try:
-            user = db.query(models.User).filter_by(username="quantum_explorer").first()
-            self.assertIsNotNone(user, "Default user should exist in DB")
-            self.assertIn(user.level, ["Beginner", "Intermediate", "Advanced", "Master"])
+        user = db.users.find_one({"username": "quantum_explorer"})
+        self.assertIsNotNone(user, "Default user should exist in DB")
+        self.assertIn(user.get("level"), ["Beginner", "Intermediate", "Advanced", "Master"])
 
-            circuits = db.query(models.SavedCircuit).filter_by(user_id=user.id).all()
-            self.assertGreaterEqual(len(circuits), 2, "Default seed circuits should be present")
-        finally:
-            db.close()
+        circuits = list(db.saved_circuits.find({"user_id": user["id"]}))
+        self.assertGreaterEqual(len(circuits), 2, "Default seed circuits should be present")
+
 
     def test_hadamard_simulation(self):
         """Verify H gate creates equal superposition and correct Bloch coordinates."""

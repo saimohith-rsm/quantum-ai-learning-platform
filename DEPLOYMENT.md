@@ -43,8 +43,13 @@ Before deploying to Vercel/Render, your code must be on GitHub:
    - **Build Command**: `pip install -r requirements.txt`
    - **Start Command**: `python run.py`
    - **Instance Type**: **Free**
-5. Click **Create Web Service**.
-6. Once deployed (approx 2 mins), copy your backend URL:
+5. **Environment Variables on Render** (Under "Advanced" ➔ "Environment Variables"):
+   - `MONGODB_URI`: Your MongoDB Atlas connection string:
+     `mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/quantum_learning?retryWrites=true&w=majority`
+     *(Free 512MB MongoDB cluster created in 1 min at [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas))*
+   - `MONGODB_DB_NAME`: `quantum_learning`
+6. Click **Create Web Service**.
+7. Once deployed (approx 2 mins), copy your live backend URL:
    👉 E.g.: `https://quantum-ai-backend.onrender.com`
 
 ---
@@ -59,14 +64,16 @@ Before deploying to Vercel/Render, your code must be on GitHub:
    - **Root Directory**: Click *Edit* and select **`frontend`**
    - **Build Command**: `npm run build`
    - **Output Directory**: `dist`
-5. **Environment Variables** (Crucial):
+5. **Environment Variables** (CRUCIAL — Fixes Signup/Auth on Deployed App):
+   - Click **Environment Variables**
    - Add a new variable:
      - **Key**: `VITE_API_BASE`
-     - **Value**: `https://quantum-ai-backend.onrender.com/api` *(Paste your Render backend URL with `/api`)*
+     - **Value**: `https://quantum-ai-backend.onrender.com/api` *(Make sure to include `/api` at the end!)*
 6. Click **Deploy**!
 
 In less than 1 minute, Vercel will give you a live production URL:
 👉 **`https://quantum-ai-platform.vercel.app`**
+
 
 ---
 

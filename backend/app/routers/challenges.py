@@ -1,11 +1,10 @@
-import json
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from app.database import get_db
+from pymongo.database import Database
+from app.database import get_db, get_next_sequence
 from app.schemas import ChallengeSubmissionRequest, ChallengeSubmissionResponse, CircuitSchema
 from app.challenges.challenge_defs import get_all_challenges, get_challenge_by_id
 from app.challenges.evaluator import evaluate_challenge_submission
-import app.models as models
 
 router = APIRouter(prefix="/api/challenges", tags=["Interactive Challenges"])
 
@@ -26,50 +25,63 @@ def get_challenge(challenge_id: str):
 def submit_challenge(
     challenge_id: str,
     req: ChallengeSubmissionRequest,
-    db: Session = Depends(get_db)
+    db: Database = Depends(get_db)
 ):
     """
     Submits a circuit for automated quantum verification.
-    Computes fidelity, verifies gate count, awards XP, and persists result to the database.
+    Computes fidelity, verifies gate count, awards XP, and persists result to MongoDB.
     """
     try:
         eval_result = evaluate_challenge_submission(challenge_id, req.circuit)
         user_id = req.user_id or 1
+        now = datetime.now(timezone.utc)
+        sub_id = get_next_sequence("submission_id", db)
 
         # Record submission in DB
-        submission = models.ChallengeSubmission(
-            user_id=user_id,
-            challenge_id=challenge_id,
-            circuit_json=req.circuit.model_dump_json(),
-            passed=eval_result.passed,
-            fidelity=eval_result.fidelity,
-            score=eval_result.score,
-            feedback=eval_result.feedback
-        )
-        db.add(submission)
+        submission = {
+            "id": sub_id,
+            "user_id": user_id,
+            "challenge_id": challenge_id,
+            "circuit_json": req.circuit.model_dump_json(),
+            "passed": eval_result.passed,
+            "fidelity": float(eval_result.fidelity),
+            "score": int(eval_result.score),
+            "feedback": eval_result.feedback,
+            "submitted_at": now
+        }
+        db.challenge_submissions.insert_one(submission)
 
         # If passed, update user XP and badges
         if eval_result.passed:
-            user = db.query(models.User).filter_by(id=user_id).first()
+            user = db.users.find_one({"id": user_id})
             if user:
-                user.xp += eval_result.score
+                new_xp = user.get("xp", 0) + eval_result.score
                 badge_earned = eval_result.details.get("badge_earned")
-                if badge_earned:
-                    current_badges = [b.strip() for b in user.badges.split(",") if b.strip()]
-                    if badge_earned not in current_badges:
-                        current_badges.append(badge_earned)
-                        user.badges = ", ".join(current_badges)
+                badges_str = user.get("badges") or ""
+                current_badges = [b.strip() for b in badges_str.split(",") if b.strip()]
+                if badge_earned and badge_earned not in current_badges:
+                    current_badges.append(badge_earned)
                 
                 # Dynamic level upgrade based on XP
-                if user.xp > 500:
-                    user.level = "Master"
-                elif user.xp > 300:
-                    user.level = "Advanced"
-                elif user.xp > 150:
-                    user.level = "Intermediate"
+                new_level = user.get("level", "Beginner")
+                if new_xp > 500:
+                    new_level = "Master"
+                elif new_xp > 300:
+                    new_level = "Advanced"
+                elif new_xp > 150:
+                    new_level = "Intermediate"
 
-        db.commit()
+                db.users.update_one(
+                    {"id": user_id},
+                    {"$set": {
+                        "xp": new_xp,
+                        "badges": ", ".join(current_badges),
+                        "level": new_level,
+                        "updated_at": now
+                    }}
+                )
+
         return eval_result
     except Exception as e:
-        db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+

@@ -3,7 +3,9 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Database Configuration
+# Database Configuration (MongoDB)
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "quantum_learning")
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'quantum_learning.db'}")
 
 # AI API Keys (Optional: fallbacks to internal verified quantum knowledge engine if unset)
@@ -33,8 +35,9 @@ else:
         "http://127.0.0.1:8000",
     ]
 
-# Regex for tunnel, local network, and cloud deployments
+# Regex for tunnel, local network, cloud deployments (Vercel, Render, Netlify, etc.)
 CORS_ORIGIN_REGEX = os.getenv(
     "CORS_ORIGIN_REGEX",
-    r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|.*\.vercel\.app|.*\.onrender\.com|.*\.ngrok-free\.(app|dev))(:\d+)?$"
+    r"^https?://.*$"
 )
+
